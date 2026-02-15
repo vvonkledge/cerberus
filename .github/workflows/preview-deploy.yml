@@ -34,7 +34,7 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const previewUrl = `https://cerberus-preview-pr-${prNumber}.<your-subdomain>.workers.dev`;
+            const previewUrl = `https://cerberus-preview-pr-${prNumber}.alexandre-leroy.workers.dev`;
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
