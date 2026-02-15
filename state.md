@@ -6,8 +6,9 @@ Implement core auth flows (register, login, token issue/validate) with a working
 
 ## Position
 
-Monorepo is set up with packages/api and packages/dashboard. Hono API serves a health check endpoint. React dashboard renders a placeholder page. Biome linting and Vitest tests pass. No auth logic, database, or real UI exists yet.
+Monorepo with packages/api and packages/dashboard. Hono API has a health endpoint and a Drizzle ORM database layer connected to Turso via @libsql/client. Local dev uses turso dev CLI; tests use in-memory SQLite. Workers compatibility is confirmed. React dashboard renders a placeholder page. No auth logic, user schema, or real UI exists yet.
 
 ## Log
 
 - **Cycle 01:** Set up pnpm monorepo with Hono API and React dashboard. All dev, lint, and test scripts work. See `cycles/01/`
+- **Cycle 02:** Added Turso database layer with Drizzle ORM and libsql adapter. Local dev via turso dev CLI, tests via in-memory SQLite, Workers compatibility confirmed. See `cycles/02/`
