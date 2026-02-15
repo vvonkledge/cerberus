@@ -1,0 +1,16 @@
+{
+	"name": "cerberus",
+	"private": true,
+	"scripts": {
+		"dev": "pnpm --parallel -r run dev",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"test": "pnpm -r run test"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": ["@biomejs/biome", "esbuild", "workerd", "sharp"]
+	}
+}
