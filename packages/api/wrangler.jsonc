@@ -1,5 +1,18 @@
 {
-	"name": "cerberus-api",
+	"name": "cerberus",
+	"account_id": "062f9ed0cfb95a028cb4b55b30a6c71d",
 	"main": "src/index.ts",
-	"compatibility_date": "2025-02-14"
+	"compatibility_date": "2025-02-14",
+	"assets": {
+		"directory": "../dashboard/dist",
+		"not_found_handling": "single-page-application"
+	},
+	"env": {
+		"staging": {
+			"name": "cerberus-staging"
+		},
+		"production": {
+			"name": "cerberus-production"
+		}
+	}
 }

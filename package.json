@@ -1,11 +1,13 @@
 {
 	"name": "cerberus",
 	"private": true,
+	"packageManager": "pnpm@10.29.1",
 	"scripts": {
 		"dev": "pnpm --parallel -r run dev",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
-		"test": "pnpm -r run test"
+		"test": "pnpm -r run test",
+		"build": "pnpm --filter @cerberus/dashboard build"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4"
