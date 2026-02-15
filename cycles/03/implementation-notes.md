@@ -20,11 +20,13 @@ Set up CI/CD pipeline with GitHub Actions for code quality checks (lint + test) 
 - `.github/workflows/staging-deploy.yml` — Builds dashboard + deploys to `cerberus-staging` on merge to main
 - `.github/workflows/production-deploy.yml` — Builds dashboard + deploys to `cerberus-production` on tag push (`v*`)
 
+- `docs/ci-cd.md` — Full CI/CD pipeline documentation
+
 ### Modified
 
-- `packages/api/wrangler.jsonc` — Added `assets` config (directory, SPA fallback), `env` block (staging, production), renamed worker from `cerberus-api` to `cerberus`
-- `packages/api/src/index.ts` — Added `ASSETS: Fetcher` to Bindings type, added catch-all `app.get("*")` to delegate non-API requests to static assets
-- `package.json` — Added `build` script (`pnpm --filter @cerberus/dashboard build`)
+- `packages/api/wrangler.jsonc` — Added `account_id`, `assets` config (directory, SPA fallback), `env` block (staging, production), renamed worker from `cerberus-api` to `cerberus`
+- `packages/api/src/index.ts` — Added `ASSETS: Fetcher` to Bindings type, added catch-all `app.get("*")`, made DB middleware defensive
+- `package.json` — Added `build` script and `packageManager` field
 
 ## Decisions Made
 
@@ -59,16 +61,57 @@ Set up CI/CD pipeline with GitHub Actions for code quality checks (lint + test) 
 
 The full test plan (test-plan.md steps 1-19) was then executed for real. Results below.
 
+### Integration Test Results
+
+**Criterion 1: PR triggers lint + tests**
+- Step 1 (create branch, push): PASS
+- Step 2 (open PR #1): PASS
+- Step 3 (PR Checks workflow triggers): PASS
+- Step 4 (lint and test jobs pass): PASS — first attempt failed (missing `packageManager` field in package.json for `pnpm/action-setup@v4`), fixed and re-triggered, second attempt passed
+
+**Criterion 2: PR triggers preview deploy**
+- Step 5 (Preview Deploy workflow triggers): PASS
+- Step 6 (unique preview URL in output): PASS — `https://cerberus-preview-pr-1.alexandre-leroy.workers.dev`
+- Step 7 (preview URL loads): PASS
+- Step 8 (health endpoint returns 200): PASS — `{"status":"ok"}`
+- Step 9 (React app loads at root): PASS — 200, HTML with React bootstrap
+
+**Criterion 3: Merge to main deploys staging**
+- Step 10 (merge PR): PASS
+- Step 11 (Staging Deploy triggers): PASS — triggered automatically on push to main
+- Step 12 (workflow completes): PASS — 28s
+- Step 13 (staging URL loads): PASS
+- Step 14 (health + React verified): PASS — `{"status":"ok"}`, 200
+
+**Criterion 4: Tag deploys production**
+- Step 15 (create and push tag v0.1.0): PASS
+- Step 16 (Production Deploy triggers): PASS
+- Step 17 (workflow completes): PASS — 28s
+- Step 18 (production URL loads): PASS
+- Step 19 (health + React verified): PASS — `{"status":"ok"}`, 200
+
+**All 19 test steps: PASS**
+
+### Fixes During Testing
+
+1. **Missing `packageManager` field:** `pnpm/action-setup@v4` requires pnpm version specified in `package.json`'s `packageManager` field. Added `"packageManager": "pnpm@10.29.1"`.
+2. **OAuth token vs API token:** Wrangler's OAuth token (used for local CLI auth) is NOT a Cloudflare API token. GitHub Actions needs a proper API token created from the Cloudflare dashboard. The initial attempt to use the OAuth token failed with "Unable to authenticate request [code: 10001]".
+3. **Preview URL placeholder:** The PR comment step had `<your-subdomain>` — replaced with actual subdomain `alexandre-leroy`.
+
 ## Challenges and Learnings
 
-- The DB middleware (`app.use("*")`) runs for all requests, including static asset requests routed through the catch-all. This is wasteful but not breaking — the `createDatabase` call creates a client instance without connecting. Future cycles should narrow the middleware scope.
-- Wrangler v4's `assets` configuration with `not_found_handling: "single-page-application"` provides clean SPA support when combined with a Worker's ASSETS binding.
+- **Don't stop at dry-runs.** The initial implementation treated wrangler dry-runs and YAML validation as sufficient verification. They're not. A dry-run proves syntax; the real test proves the pipeline works. Always run the actual test plan.
+- **`pnpm/action-setup@v4` requires `packageManager` field.** The action can't auto-detect the pnpm version — it needs `"packageManager": "pnpm@x.y.z"` in root package.json.
+- **Wrangler OAuth ≠ Cloudflare API token.** Wrangler CLI uses an OAuth flow stored in `~/Library/Preferences/.wrangler/config/default.toml`. This token is NOT a Cloudflare API token and cannot be used in CI. GitHub Actions needs a real API token created from https://dash.cloudflare.com/profile/api-tokens.
+- The DB middleware (`app.use("*")`) runs for all requests including static asset requests. Made it defensive (skip if `TURSO_DATABASE_URL` unset) so deployments work without Turso configured. Future cycles should narrow the middleware scope.
+- Wrangler v4's `assets` with `not_found_handling: "single-page-application"` provides clean SPA support from a Worker.
 - Preview deployments via `--name` override are simpler than using a wrangler environment — each PR gets a unique Worker name and URL.
-- The `preview-deploy.yml` contains a placeholder `<your-subdomain>` in the PR comment step — the user needs to replace this with their actual Cloudflare Workers subdomain, or remove the comment step entirely.
 
 ## Notes for REFLECT
 
-- The preview-deploy workflow's PR comment step has a placeholder subdomain that needs updating
-- Turso secrets must be configured per Cloudflare environment for the health endpoint to work (DB middleware runs on all routes)
-- Worker name changed from `cerberus-api` to `cerberus` — any existing Workers with the old name won't be affected
-- The `packages/dashboard/dist/` directory is gitignored (Vite default) — CI builds it fresh each deployment
+- All 4 success criteria verified end-to-end with real GitHub Actions and Cloudflare deployments
+- Live URLs: staging at `cerberus-staging.alexandre-leroy.workers.dev`, production at `cerberus-production.alexandre-leroy.workers.dev`
+- Turso secrets must be configured per Cloudflare environment for database-dependent routes
+- Worker name changed from `cerberus-api` to `cerberus`
+- Preview workers (e.g., `cerberus-preview-pr-1`) persist after PR close — consider cleanup automation in a future cycle
+- `docs/ci-cd.md` was created documenting the full pipeline setup
