@@ -1,6 +1,7 @@
 {
 	"name": "cerberus",
 	"private": true,
+	"packageManager": "pnpm@10.29.1",
 	"scripts": {
 		"dev": "pnpm --parallel -r run dev",
 		"lint": "biome check .",
