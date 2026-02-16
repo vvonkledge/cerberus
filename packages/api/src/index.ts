@@ -25,8 +25,17 @@ app.use("*", async (c, next) => {
 	await next();
 });
 
-app.get("/health", (c) => {
-	return c.json({ status: "ok" });
+app.get("/health", async (c) => {
+	const db = c.get("db");
+	if (!db) {
+		return c.json({ status: "ok", db: "not_configured" });
+	}
+	try {
+		await db.run("SELECT 1");
+		return c.json({ status: "ok", db: "ok" });
+	} catch {
+		return c.json({ status: "ok", db: "error" }, 500);
+	}
 });
 
 app.get("*", async (c) => {
