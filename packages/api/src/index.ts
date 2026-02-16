@@ -25,6 +25,8 @@ app.use("*", async (c, next) => {
 	await next();
 });
 
+app.get("/ping", (c) => c.text("pong"));
+
 app.get("/health", async (c) => {
 	const db = c.get("db");
 	if (!db) {
