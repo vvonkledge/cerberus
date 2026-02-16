@@ -18,6 +18,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
+      - name: Push database schema
+        working-directory: packages/api
+        run: npx drizzle-kit push
+        env:
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_STAGING_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_STAGING_AUTH_TOKEN }}
+
       - name: Deploy to Cloudflare Workers (staging)
         working-directory: packages/api
         run: npx wrangler deploy --env staging
