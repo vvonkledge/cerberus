@@ -22,12 +22,40 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
+      - name: Install Turso CLI
+        run: |
+          curl -sSfL https://get.tur.so/install.sh | bash
+          echo "$HOME/.turso" >> "$GITHUB_PATH"
+
+      - name: Create per-PR database
+        run: |
+          DB_NAME="cerberus-pr-${{ github.event.pull_request.number }}"
+          if turso db show "$DB_NAME" &>/dev/null; then
+            echo "Database $DB_NAME already exists, reusing"
+          else
+            turso db create "$DB_NAME"
+          fi
+        env:
+          TURSO_API_TOKEN: ${{ secrets.TURSO_API_TOKEN }}
+
+      - name: Get database credentials
+        id: db-creds
+        run: |
+          DB_NAME="cerberus-pr-${{ github.event.pull_request.number }}"
+          DB_URL=$(turso db show "$DB_NAME" --url)
+          DB_TOKEN=$(turso db tokens create "$DB_NAME")
+          echo "::add-mask::$DB_TOKEN"
+          echo "url=$DB_URL" >> "$GITHUB_OUTPUT"
+          echo "token=$DB_TOKEN" >> "$GITHUB_OUTPUT"
+        env:
+          TURSO_API_TOKEN: ${{ secrets.TURSO_API_TOKEN }}
+
       - name: Push database schema
         working-directory: packages/api
         run: npx drizzle-kit push
         env:
-          TURSO_DATABASE_URL: ${{ secrets.TURSO_PREVIEW_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_PREVIEW_AUTH_TOKEN }}
+          TURSO_DATABASE_URL: ${{ steps.db-creds.outputs.url }}
+          TURSO_AUTH_TOKEN: ${{ steps.db-creds.outputs.token }}
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -39,8 +67,8 @@ jobs:
       - name: Set preview worker secrets
         working-directory: packages/api
         run: |
-          echo "${{ secrets.TURSO_PREVIEW_DATABASE_URL }}" | npx wrangler secret put TURSO_DATABASE_URL --name cerberus-preview-pr-${{ github.event.pull_request.number }}
-          echo "${{ secrets.TURSO_PREVIEW_AUTH_TOKEN }}" | npx wrangler secret put TURSO_AUTH_TOKEN --name cerberus-preview-pr-${{ github.event.pull_request.number }}
+          echo "${{ steps.db-creds.outputs.url }}" | npx wrangler secret put TURSO_DATABASE_URL --name cerberus-preview-pr-${{ github.event.pull_request.number }}
+          echo "${{ steps.db-creds.outputs.token }}" | npx wrangler secret put TURSO_AUTH_TOKEN --name cerberus-preview-pr-${{ github.event.pull_request.number }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
