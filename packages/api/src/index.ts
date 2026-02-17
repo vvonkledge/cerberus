@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import login from "./auth/login";
+import refresh from "./auth/refresh";
 import register from "./auth/register";
+import revoke from "./auth/revoke";
 import { createDatabase } from "./db/client";
 import type { Database } from "./db/client";
 
@@ -43,6 +45,8 @@ app.get("/health", async (c) => {
 
 app.route("/register", register);
 app.route("/login", login);
+app.route("/refresh", refresh);
+app.route("/revoke", revoke);
 
 app.get("*", async (c) => {
 	return c.env.ASSETS.fetch(c.req.raw);

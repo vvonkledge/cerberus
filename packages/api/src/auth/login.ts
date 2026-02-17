@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Database } from "../db/client";
-import { users } from "../db/schema";
-import { signJwt, verifyPassword } from "./crypto";
+import { refreshTokens, users } from "../db/schema";
+import { generateRefreshToken, signJwt, verifyPassword } from "./crypto";
 
 type Bindings = {
 	TURSO_DATABASE_URL: string;
@@ -39,8 +39,17 @@ login.post("/", async (c) => {
 
 	const token = await signJwt({ sub: String(user.id) }, c.env.JWT_SECRET);
 
+	const refreshToken = generateRefreshToken();
+	const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+	await db.insert(refreshTokens).values({
+		token: refreshToken,
+		userId: user.id,
+		expiresAt,
+	});
+
 	return c.json({
 		access_token: token,
+		refresh_token: refreshToken,
 		token_type: "Bearer",
 		expires_in: 3600,
 	});

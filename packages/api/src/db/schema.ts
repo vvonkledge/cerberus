@@ -19,3 +19,14 @@ export const users = sqliteTable("users", {
 		.notNull()
 		.$defaultFn(() => new Date().toISOString()),
 });
+
+export const refreshTokens = sqliteTable("refresh_tokens", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	token: text("token").unique().notNull(),
+	userId: integer("user_id").notNull(),
+	expiresAt: text("expires_at").notNull(),
+	revokedAt: text("revoked_at"),
+	createdAt: text("created_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+});

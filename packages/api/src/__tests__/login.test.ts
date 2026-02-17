@@ -23,6 +23,17 @@ async function setupTestApp() {
 		)
 	`);
 
+	await db.run(`
+		CREATE TABLE refresh_tokens (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			token TEXT UNIQUE NOT NULL,
+			user_id INTEGER NOT NULL,
+			expires_at TEXT NOT NULL,
+			revoked_at TEXT,
+			created_at TEXT NOT NULL DEFAULT (datetime('now'))
+		)
+	`);
+
 	const hashed = await hashPassword(TEST_PASSWORD);
 	await db.insert(users).values({
 		email: TEST_EMAIL,
@@ -68,6 +79,7 @@ describe("POST /login", () => {
 		const body = await res.json();
 		expect(body).toMatchObject({
 			access_token: expect.any(String),
+			refresh_token: expect.any(String),
 			token_type: "Bearer",
 			expires_in: 3600,
 		});

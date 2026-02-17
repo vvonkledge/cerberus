@@ -1,4 +1,4 @@
-function hexEncode(buffer: ArrayBuffer): string {
+export function hexEncode(buffer: ArrayBuffer): string {
 	return Array.from(new Uint8Array(buffer))
 		.map((b) => b.toString(16).padStart(2, "0"))
 		.join("");
@@ -117,6 +117,11 @@ export async function signJwt(
 	);
 
 	return `${signingInput}.${base64UrlEncode(signature)}`;
+}
+
+export function generateRefreshToken(): string {
+	const bytes = crypto.getRandomValues(new Uint8Array(32));
+	return hexEncode(bytes.buffer as ArrayBuffer);
 }
 
 export async function verifyJwt(
