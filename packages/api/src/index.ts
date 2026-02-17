@@ -1,10 +1,13 @@
 import { Hono } from "hono";
+import login from "./auth/login";
+import register from "./auth/register";
 import { createDatabase } from "./db/client";
 import type { Database } from "./db/client";
 
 type Bindings = {
 	TURSO_DATABASE_URL: string;
 	TURSO_AUTH_TOKEN?: string;
+	JWT_SECRET: string;
 	ASSETS: Fetcher;
 };
 
@@ -37,6 +40,9 @@ app.get("/health", async (c) => {
 		return c.json({ status: "ok", db: "error" }, 500);
 	}
 });
+
+app.route("/register", register);
+app.route("/login", login);
 
 app.get("*", async (c) => {
 	return c.env.ASSETS.fetch(c.req.raw);

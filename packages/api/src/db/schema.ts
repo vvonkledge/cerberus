@@ -7,3 +7,15 @@ export const healthChecks = sqliteTable("health_checks", {
 		.notNull()
 		.$defaultFn(() => new Date().toISOString()),
 });
+
+export const users = sqliteTable("users", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	email: text("email").unique().notNull(),
+	hashedPassword: text("hashed_password").notNull(),
+	createdAt: text("created_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	updatedAt: text("updated_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+});
