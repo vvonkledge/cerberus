@@ -121,9 +121,61 @@ describe("POST /refresh", () => {
 		const body = await res.json();
 		expect(body).toMatchObject({
 			access_token: expect.any(String),
+			refresh_token: expect.any(String),
 			token_type: "Bearer",
 			expires_in: 3600,
 		});
+	});
+
+	it("returns new refresh token on successful refresh", async () => {
+		const { app } = await setupTestApp();
+		const tokens = await loginAndGetTokens(app);
+
+		const res = await postRefresh(app, {
+			refresh_token: tokens.refresh_token,
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as { access_token: string; refresh_token: string };
+		expect(body.access_token).toEqual(expect.any(String));
+		expect(body.refresh_token).toEqual(expect.any(String));
+		expect(body.refresh_token).not.toBe(tokens.refresh_token);
+	});
+
+	it("invalidates old refresh token after rotation", async () => {
+		const { app } = await setupTestApp();
+		const tokens = await loginAndGetTokens(app);
+
+		// Use the refresh token (this should rotate it)
+		await postRefresh(app, { refresh_token: tokens.refresh_token });
+
+		// Try to use the old refresh token again
+		const res = await postRefresh(app, {
+			refresh_token: tokens.refresh_token,
+		});
+
+		expect(res.status).toBe(401);
+		const body = await res.json();
+		expect(body).toEqual({ error: "Refresh token revoked" });
+	});
+
+	it("rejects already-rotated token in a chain", async () => {
+		const { app } = await setupTestApp();
+		const tokens = await loginAndGetTokens(app);
+
+		// Refresh with A -> get B
+		const resB = await postRefresh(app, { refresh_token: tokens.refresh_token });
+		const bodyB = (await resB.json()) as { refresh_token: string };
+
+		// Refresh with B -> get C
+		const resC = await postRefresh(app, { refresh_token: bodyB.refresh_token });
+		expect(resC.status).toBe(200);
+
+		// Try to refresh with B (already rotated) -> should fail
+		const res = await postRefresh(app, { refresh_token: bodyB.refresh_token });
+		expect(res.status).toBe(401);
+		const body = await res.json();
+		expect(body).toEqual({ error: "Refresh token revoked" });
 	});
 
 	it("returns 401 for an expired refresh token", async () => {

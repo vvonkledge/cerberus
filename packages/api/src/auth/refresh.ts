@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Database } from "../db/client";
 import { refreshTokens } from "../db/schema";
-import { signJwt } from "./crypto";
+import { generateRefreshToken, signJwt } from "./crypto";
 
 type Bindings = {
 	TURSO_DATABASE_URL: string;
@@ -43,10 +43,26 @@ refresh.post("/", async (c) => {
 		return c.json({ error: "Refresh token expired" }, 401);
 	}
 
+	// Revoke the old refresh token
+	await db
+		.update(refreshTokens)
+		.set({ revokedAt: new Date().toISOString() })
+		.where(eq(refreshTokens.token, refresh_token));
+
+	// Generate and store a new refresh token
+	const newRefreshToken = generateRefreshToken();
+	const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+	await db.insert(refreshTokens).values({
+		token: newRefreshToken,
+		userId: row.userId,
+		expiresAt,
+	});
+
 	const token = await signJwt({ sub: String(row.userId) }, c.env.JWT_SECRET);
 
 	return c.json({
 		access_token: token,
+		refresh_token: newRefreshToken,
 		token_type: "Bearer",
 		expires_in: 3600,
 	});
