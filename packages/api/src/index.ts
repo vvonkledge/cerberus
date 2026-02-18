@@ -5,6 +5,8 @@ import register from "./auth/register";
 import revoke from "./auth/revoke";
 import { createDatabase } from "./db/client";
 import type { Database } from "./db/client";
+import roles from "./rbac/roles";
+import userRoles from "./rbac/user-roles";
 
 type Bindings = {
 	TURSO_DATABASE_URL: string;
@@ -47,6 +49,8 @@ app.route("/register", register);
 app.route("/login", login);
 app.route("/refresh", refresh);
 app.route("/revoke", revoke);
+app.route("/roles", roles);
+app.route("/users", userRoles);
 
 app.get("*", async (c) => {
 	return c.env.ASSETS.fetch(c.req.raw);

@@ -30,3 +30,38 @@ export const refreshTokens = sqliteTable("refresh_tokens", {
 		.notNull()
 		.$defaultFn(() => new Date().toISOString()),
 });
+
+export const roles = sqliteTable("roles", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	name: text("name").unique().notNull(),
+	description: text("description"),
+	createdAt: text("created_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+});
+
+export const permissions = sqliteTable("permissions", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	permission: text("permission").unique().notNull(),
+	createdAt: text("created_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+});
+
+export const rolePermissions = sqliteTable("role_permissions", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	roleId: integer("role_id").notNull(),
+	permissionId: integer("permission_id").notNull(),
+	createdAt: text("created_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+});
+
+export const userRoles = sqliteTable("user_roles", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	userId: integer("user_id").notNull(),
+	roleId: integer("role_id").notNull(),
+	createdAt: text("created_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+});
