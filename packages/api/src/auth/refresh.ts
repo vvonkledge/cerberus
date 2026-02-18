@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull, lt, or } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Database } from "../db/client";
 import { refreshTokens } from "../db/schema";
@@ -57,6 +57,19 @@ refresh.post("/", async (c) => {
 		userId: row.userId,
 		expiresAt,
 	});
+
+	// Eager cleanup: remove all revoked or expired tokens for this user
+	await db
+		.delete(refreshTokens)
+		.where(
+			and(
+				eq(refreshTokens.userId, row.userId),
+				or(
+					isNotNull(refreshTokens.revokedAt),
+					lt(refreshTokens.expiresAt, new Date().toISOString()),
+				),
+			),
+		);
 
 	const token = await signJwt({ sub: String(row.userId) }, c.env.JWT_SECRET);
 

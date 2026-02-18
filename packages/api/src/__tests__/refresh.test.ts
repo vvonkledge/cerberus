@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { hashPassword, verifyJwt } from "../auth/crypto";
@@ -149,14 +150,14 @@ describe("POST /refresh", () => {
 		// Use the refresh token (this should rotate it)
 		await postRefresh(app, { refresh_token: tokens.refresh_token });
 
-		// Try to use the old refresh token again
+		// Try to use the old refresh token again (it was cleaned up during rotation)
 		const res = await postRefresh(app, {
 			refresh_token: tokens.refresh_token,
 		});
 
 		expect(res.status).toBe(401);
 		const body = await res.json();
-		expect(body).toEqual({ error: "Refresh token revoked" });
+		expect(body).toEqual({ error: "Invalid refresh token" });
 	});
 
 	it("rejects already-rotated token in a chain", async () => {
@@ -171,11 +172,11 @@ describe("POST /refresh", () => {
 		const resC = await postRefresh(app, { refresh_token: bodyB.refresh_token });
 		expect(resC.status).toBe(200);
 
-		// Try to refresh with B (already rotated) -> should fail
+		// Try to refresh with B (already rotated and cleaned up) -> should fail
 		const res = await postRefresh(app, { refresh_token: bodyB.refresh_token });
 		expect(res.status).toBe(401);
 		const body = await res.json();
-		expect(body).toEqual({ error: "Refresh token revoked" });
+		expect(body).toEqual({ error: "Invalid refresh token" });
 	});
 
 	it("returns 401 for an expired refresh token", async () => {
@@ -236,6 +237,38 @@ describe("POST /refresh", () => {
 		expect(claims).not.toBeNull();
 		expect(claims!.sub).toBe("1");
 		expect(claims!.exp - claims!.iat).toBe(3600);
+	});
+
+	it("cleans up revoked and expired tokens during rotation", async () => {
+		const { app, db } = await setupTestApp();
+		const tokens = await loginAndGetTokens(app);
+
+		// Rotate A -> B (A becomes revoked)
+		const resB = await postRefresh(app, { refresh_token: tokens.refresh_token });
+		expect(resB.status).toBe(200);
+		const bodyB = (await resB.json()) as { refresh_token: string };
+
+		// Insert an expired token directly to simulate a stale expired row
+		await db.run(`
+			INSERT INTO refresh_tokens (token, user_id, expires_at, created_at)
+			VALUES ('manually-expired', 1, '2020-01-01T00:00:00.000Z', '2020-01-01T00:00:00.000Z')
+		`);
+
+		// Rotate B -> C (B becomes revoked; cleanup should remove A, B revoked + expired token)
+		const resC = await postRefresh(app, { refresh_token: bodyB.refresh_token });
+		expect(resC.status).toBe(200);
+		const bodyC = (await resC.json()) as { refresh_token: string };
+
+		// Query remaining tokens for user 1
+		const remaining = await db
+			.select()
+			.from(refreshTokens)
+			.where(eq(refreshTokens.userId, 1));
+
+		// Only the latest non-revoked, unexpired token (C) should remain
+		expect(remaining).toHaveLength(1);
+		expect(remaining[0].token).toBe(bodyC.refresh_token);
+		expect(remaining[0].revokedAt).toBeNull();
 	});
 });
 
