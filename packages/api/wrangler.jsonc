@@ -7,6 +7,9 @@
 		"directory": "../dashboard/dist",
 		"not_found_handling": "single-page-application"
 	},
+	"kv_namespaces": [
+		{ "binding": "RATE_LIMIT_KV", "id": "placeholder-id" }
+	],
 	"env": {
 		"staging": {
 			"name": "cerberus-staging"

@@ -5,6 +5,11 @@ import register from "./auth/register";
 import revoke from "./auth/revoke";
 import { createDatabase } from "./db/client";
 import type { Database } from "./db/client";
+import {
+	InMemoryRateLimitStore,
+	KVRateLimitStore,
+	rateLimiter,
+} from "./middleware/rate-limiter";
 import roles from "./rbac/roles";
 import userRoles from "./rbac/user-roles";
 
@@ -13,6 +18,7 @@ type Bindings = {
 	TURSO_AUTH_TOKEN?: string;
 	JWT_SECRET: string;
 	ASSETS: Fetcher;
+	RATE_LIMIT_KV?: KVNamespace;
 };
 
 type Variables = {
@@ -20,6 +26,9 @@ type Variables = {
 };
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+
+// Fallback in-memory store used when KV is not available (e.g. tests)
+const fallbackStore = new InMemoryRateLimitStore();
 
 app.use("*", async (c, next) => {
 	if (c.env.TURSO_DATABASE_URL) {
@@ -45,9 +54,41 @@ app.get("/health", async (c) => {
 	}
 });
 
-app.route("/register", register);
-app.route("/login", login);
-app.route("/refresh", refresh);
+function getStore(env: { RATE_LIMIT_KV?: KVNamespace }) {
+	if (env.RATE_LIMIT_KV) {
+		return new KVRateLimitStore(env.RATE_LIMIT_KV);
+	}
+	return fallbackStore;
+}
+
+// Rate-limited auth routes
+const loginApp = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+loginApp.use("*", async (c, next) => {
+	const store = getStore(c.env);
+	const mw = rateLimiter({ limit: 10, windowMs: 60_000, store });
+	return mw(c, next);
+});
+loginApp.route("/", login);
+
+const registerApp = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+registerApp.use("*", async (c, next) => {
+	const store = getStore(c.env);
+	const mw = rateLimiter({ limit: 5, windowMs: 60_000, store });
+	return mw(c, next);
+});
+registerApp.route("/", register);
+
+const refreshApp = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+refreshApp.use("*", async (c, next) => {
+	const store = getStore(c.env);
+	const mw = rateLimiter({ limit: 10, windowMs: 60_000, store });
+	return mw(c, next);
+});
+refreshApp.route("/", refresh);
+
+app.route("/register", registerApp);
+app.route("/login", loginApp);
+app.route("/refresh", refreshApp);
 app.route("/revoke", revoke);
 app.route("/roles", roles);
 app.route("/users", userRoles);
