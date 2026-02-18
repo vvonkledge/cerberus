@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it } from "vitest";
+import { signJwt } from "../auth/crypto";
 import { type Database, createDatabase } from "../db/client";
+import { authMiddleware } from "../middleware/auth";
+import { requirePermission } from "../middleware/authorization";
 import { users } from "../db/schema";
 import rolesApp from "../rbac/roles";
 import userRolesApp from "../rbac/user-roles";
@@ -51,8 +54,11 @@ const CREATE_TABLES = `
 	);
 `;
 
+const TEST_JWT_SECRET = "test-secret-for-list";
+
 let testApp: Hono;
 let db: Database;
+let validToken: string;
 
 beforeEach(async () => {
 	db = createDatabase({ url: "file::memory:" });
@@ -60,25 +66,58 @@ beforeEach(async () => {
 		await db.run(stmt);
 	}
 
+	// Seed admin role and permissions for the test user (sub: "1")
+	await db.run("INSERT INTO roles (name, description, created_at) VALUES ('__seed__', 'Seed', datetime('now'))");
+	await db.run("INSERT INTO permissions (permission, created_at) VALUES ('manage_roles', datetime('now'))");
+	await db.run("INSERT INTO permissions (permission, created_at) VALUES ('manage_users', datetime('now'))");
+	await db.run("INSERT INTO role_permissions (role_id, permission_id, created_at) VALUES (1, 1, datetime('now'))");
+	await db.run("INSERT INTO role_permissions (role_id, permission_id, created_at) VALUES (1, 2, datetime('now'))");
+	await db.run("INSERT INTO user_roles (user_id, role_id, created_at) VALUES (1, 1, datetime('now'))");
+
+	validToken = await signJwt({ sub: "1" }, TEST_JWT_SECRET);
+
 	const app = new Hono<{
-		Bindings: { TURSO_DATABASE_URL: string; TURSO_AUTH_TOKEN?: string };
-		Variables: { db: Database };
+		Bindings: { TURSO_DATABASE_URL: string; TURSO_AUTH_TOKEN?: string; JWT_SECRET: string };
+		Variables: { db: Database; user: { sub: string; iat: number; exp: number } };
 	}>();
 	app.use("*", async (c, next) => {
 		c.set("db", db);
 		await next();
 	});
-	app.route("/roles", rolesApp);
-	app.route("/users", userRolesApp);
+	const protectedRoles = new Hono<{
+		Bindings: { TURSO_DATABASE_URL: string; TURSO_AUTH_TOKEN?: string; JWT_SECRET: string };
+		Variables: { db: Database; user: { sub: string; iat: number; exp: number } };
+	}>();
+	protectedRoles.use("*", authMiddleware());
+	protectedRoles.use("*", requirePermission("manage_roles"));
+	protectedRoles.route("/", rolesApp);
+
+	const protectedUsers = new Hono<{
+		Bindings: { TURSO_DATABASE_URL: string; TURSO_AUTH_TOKEN?: string; JWT_SECRET: string };
+		Variables: { db: Database; user: { sub: string; iat: number; exp: number } };
+	}>();
+	protectedUsers.use("*", authMiddleware());
+	protectedUsers.use("*", requirePermission("manage_users"));
+	protectedUsers.route("/", userRolesApp);
+
+	app.route("/roles", protectedRoles);
+	app.route("/users", protectedUsers);
 	testApp = app;
 });
 
 function postRoles(path: string, body: unknown) {
-	return testApp.request(`/roles${path}`, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(body),
-	});
+	return testApp.request(
+		`/roles${path}`,
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${validToken}`,
+			},
+			body: JSON.stringify(body),
+		},
+		{ JWT_SECRET: TEST_JWT_SECRET },
+	);
 }
 
 async function createUser(email: string): Promise<number> {
@@ -104,19 +143,31 @@ async function createRoleWithPermissions(
 }
 
 describe("GET /roles", () => {
-	it("returns empty array when no roles exist", async () => {
-		const res = await testApp.request("/roles", { method: "GET" });
+	it("returns the seeded admin role when no additional roles created", async () => {
+		const res = await testApp.request(
+			"/roles",
+			{ method: "GET", headers: { Authorization: `Bearer ${validToken}` } },
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
 
 		expect(res.status).toBe(200);
-		const body = await res.json();
-		expect(body).toEqual([]);
+		const body = (await res.json()) as Array<{
+			name: string;
+			permissions: string[];
+		}>;
+		expect(body).toHaveLength(1);
+		expect(body[0].name).toBe("__seed__");
 	});
 
 	it("returns roles with their permissions", async () => {
 		await createRoleWithPermissions("admin", ["users:read", "users:write"]);
 		await createRoleWithPermissions("viewer", ["users:read"]);
 
-		const res = await testApp.request("/roles", { method: "GET" });
+		const res = await testApp.request(
+			"/roles",
+			{ method: "GET", headers: { Authorization: `Bearer ${validToken}` } },
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
 
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as Array<{
@@ -125,7 +176,7 @@ describe("GET /roles", () => {
 			description: string | null;
 			permissions: string[];
 		}>;
-		expect(body).toHaveLength(2);
+		expect(body).toHaveLength(3);
 
 		const admin = body.find((r) => r.name === "admin");
 		expect(admin).toBeDefined();
@@ -141,22 +192,31 @@ describe("GET /roles", () => {
 	it("returns role with empty permissions when none assigned", async () => {
 		await postRoles("", { name: "empty-role", description: "No perms" });
 
-		const res = await testApp.request("/roles", { method: "GET" });
+		const res = await testApp.request(
+			"/roles",
+			{ method: "GET", headers: { Authorization: `Bearer ${validToken}` } },
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
 
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as Array<{
 			name: string;
 			permissions: string[];
 		}>;
-		expect(body).toHaveLength(1);
-		expect(body[0].name).toBe("empty-role");
-		expect(body[0].permissions).toEqual([]);
+		expect(body).toHaveLength(2);
+		const emptyRole = body.find((r) => r.name === "empty-role");
+		expect(emptyRole).toBeDefined();
+		expect(emptyRole!.permissions).toEqual([]);
 	});
 });
 
 describe("GET /users", () => {
 	it("returns empty array when no users exist", async () => {
-		const res = await testApp.request("/users", { method: "GET" });
+		const res = await testApp.request(
+			"/users",
+			{ method: "GET", headers: { Authorization: `Bearer ${validToken}` } },
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
 
 		expect(res.status).toBe(200);
 		const body = await res.json();
@@ -167,7 +227,11 @@ describe("GET /users", () => {
 		await createUser("alice@example.com");
 		await createUser("bob@example.com");
 
-		const res = await testApp.request("/users", { method: "GET" });
+		const res = await testApp.request(
+			"/users",
+			{ method: "GET", headers: { Authorization: `Bearer ${validToken}` } },
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
 
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as Array<{ id: number; email: string }>;
@@ -177,5 +241,35 @@ describe("GET /users", () => {
 		// Ensure no extra fields like hashed_password are returned
 		expect(body[0]).not.toHaveProperty("hashedPassword");
 		expect(body[0]).not.toHaveProperty("hashed_password");
+	});
+});
+
+describe("Authorization on list endpoints", () => {
+	let noPermToken: string;
+
+	beforeEach(async () => {
+		noPermToken = await signJwt({ sub: "999" }, TEST_JWT_SECRET);
+	});
+
+	it("returns 403 for GET /roles without manage_roles permission", async () => {
+		const res = await testApp.request(
+			"/roles",
+			{ method: "GET", headers: { Authorization: `Bearer ${noPermToken}` } },
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Forbidden");
+	});
+
+	it("returns 403 for GET /users without manage_users permission", async () => {
+		const res = await testApp.request(
+			"/users",
+			{ method: "GET", headers: { Authorization: `Bearer ${noPermToken}` } },
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Forbidden");
 	});
 });

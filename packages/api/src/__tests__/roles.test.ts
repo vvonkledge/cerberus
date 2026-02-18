@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it } from "vitest";
+import { signJwt } from "../auth/crypto";
 import { type Database, createDatabase } from "../db/client";
+import { authMiddleware } from "../middleware/auth";
+import { requirePermission } from "../middleware/authorization";
 import rolesApp from "../rbac/roles";
 
 const CREATE_TABLES = `
@@ -49,8 +52,11 @@ const CREATE_TABLES = `
 	);
 `;
 
+const TEST_JWT_SECRET = "test-secret-for-roles";
+
 let testApp: Hono;
 let db: Database;
+let validToken: string;
 
 beforeEach(async () => {
 	db = createDatabase({ url: "file::memory:" });
@@ -58,24 +64,48 @@ beforeEach(async () => {
 		await db.run(stmt);
 	}
 
+	// Seed admin role and permissions for the test user (sub: "1")
+	await db.run("INSERT INTO roles (name, description, created_at) VALUES ('__seed__', 'Seed', datetime('now'))");
+	await db.run("INSERT INTO permissions (permission, created_at) VALUES ('manage_roles', datetime('now'))");
+	await db.run("INSERT INTO permissions (permission, created_at) VALUES ('manage_users', datetime('now'))");
+	await db.run("INSERT INTO role_permissions (role_id, permission_id, created_at) VALUES (1, 1, datetime('now'))");
+	await db.run("INSERT INTO role_permissions (role_id, permission_id, created_at) VALUES (1, 2, datetime('now'))");
+	await db.run("INSERT INTO user_roles (user_id, role_id, created_at) VALUES (1, 1, datetime('now'))");
+
+	validToken = await signJwt({ sub: "1" }, TEST_JWT_SECRET);
+
 	const app = new Hono<{
-		Bindings: { TURSO_DATABASE_URL: string; TURSO_AUTH_TOKEN?: string };
-		Variables: { db: Database };
+		Bindings: { TURSO_DATABASE_URL: string; TURSO_AUTH_TOKEN?: string; JWT_SECRET: string };
+		Variables: { db: Database; user: { sub: string; iat: number; exp: number } };
 	}>();
 	app.use("*", async (c, next) => {
 		c.set("db", db);
 		await next();
 	});
-	app.route("/roles", rolesApp);
+	const protectedRoles = new Hono<{
+		Bindings: { TURSO_DATABASE_URL: string; TURSO_AUTH_TOKEN?: string; JWT_SECRET: string };
+		Variables: { db: Database; user: { sub: string; iat: number; exp: number } };
+	}>();
+	protectedRoles.use("*", authMiddleware());
+	protectedRoles.use("*", requirePermission("manage_roles"));
+	protectedRoles.route("/", rolesApp);
+	app.route("/roles", protectedRoles);
 	testApp = app;
 });
 
 function rolesRequest(path: string, body: unknown) {
-	return testApp.request(`/roles${path}`, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(body),
-	});
+	return testApp.request(
+		`/roles${path}`,
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${validToken}`,
+			},
+			body: JSON.stringify(body),
+		},
+		{ JWT_SECRET: TEST_JWT_SECRET },
+	);
 }
 
 describe("POST /roles", () => {
@@ -136,5 +166,102 @@ describe("POST /roles/:roleId/permissions", () => {
 		});
 
 		expect(res.status).toBe(404);
+	});
+});
+
+describe("Auth middleware on /roles", () => {
+	it("returns 401 for GET /roles without Authorization header", async () => {
+		const res = await testApp.request(
+			"/roles",
+			{ method: "GET" },
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Authorization required");
+	});
+
+	it("returns 401 for POST /roles without Authorization header", async () => {
+		const res = await testApp.request(
+			"/roles",
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ name: "admin", description: "Admin" }),
+			},
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Authorization required");
+	});
+
+	it("returns 401 for request with invalid JWT", async () => {
+		const res = await testApp.request(
+			"/roles",
+			{
+				method: "GET",
+				headers: { Authorization: "Bearer invalid.token.here" },
+			},
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Invalid token");
+	});
+});
+
+describe("Authorization on /roles", () => {
+	let noPermToken: string;
+
+	beforeEach(async () => {
+		noPermToken = await signJwt({ sub: "999" }, TEST_JWT_SECRET);
+	});
+
+	it("returns 403 for GET /roles without manage_roles permission", async () => {
+		const res = await testApp.request(
+			"/roles",
+			{ method: "GET", headers: { Authorization: `Bearer ${noPermToken}` } },
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Forbidden");
+	});
+
+	it("returns 403 for POST /roles without manage_roles permission", async () => {
+		const res = await testApp.request(
+			"/roles",
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${noPermToken}`,
+				},
+				body: JSON.stringify({ name: "test", description: "Test" }),
+			},
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Forbidden");
+	});
+
+	it("returns 403 for POST /roles/:id/permissions without manage_roles permission", async () => {
+		const res = await testApp.request(
+			"/roles/1/permissions",
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${noPermToken}`,
+				},
+				body: JSON.stringify({ permission: "test:read" }),
+			},
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Forbidden");
 	});
 });
