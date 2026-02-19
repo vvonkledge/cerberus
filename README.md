@@ -1,6 +1,14 @@
 # Cerberus
 
+[![CI](https://github.com/vvonkledge/cerberus/actions/workflows/pr-checks.yml/badge.svg)](https://github.com/vvonkledge/cerberus/actions/workflows/pr-checks.yml)
+[![Staging Deploy](https://github.com/vvonkledge/cerberus/actions/workflows/staging-deploy.yml/badge.svg)](https://github.com/vvonkledge/cerberus/actions/workflows/staging-deploy.yml)
+[![Production Deploy](https://github.com/vvonkledge/cerberus/actions/workflows/production-deploy.yml/badge.svg)](https://github.com/vvonkledge/cerberus/actions/workflows/production-deploy.yml)
+
 Auth-as-a-service for solo developers. One centralized authentication and authorization backend for all your web applications.
+
+**Live environments:**
+[Production](https://cerberus-production.alexandre-leroy.workers.dev) |
+[Staging](https://cerberus-staging.alexandre-leroy.workers.dev)
 
 ## What is this project, really?
 

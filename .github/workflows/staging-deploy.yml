@@ -8,6 +8,9 @@ jobs:
   deploy:
     name: Deploy Staging
     runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://cerberus-staging.alexandre-leroy.workers.dev
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

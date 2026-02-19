@@ -8,6 +8,9 @@ jobs:
   deploy:
     name: Deploy Preview
     runs-on: ubuntu-latest
+    environment:
+      name: preview-pr-${{ github.event.pull_request.number }}
+      url: https://cerberus-preview-pr-${{ github.event.pull_request.number }}.alexandre-leroy.workers.dev
     permissions:
       contents: read
       deployments: write
