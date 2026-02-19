@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+import forgotPassword from "./auth/forgot-password";
 import login from "./auth/login";
 import refresh from "./auth/refresh";
 import register from "./auth/register";
+import resetPassword from "./auth/reset-password";
 import revoke from "./auth/revoke";
 import { createDatabase } from "./db/client";
 import type { Database } from "./db/client";
@@ -95,6 +97,8 @@ app.route("/register", registerApp);
 app.route("/login", loginApp);
 app.route("/refresh", refreshApp);
 app.route("/revoke", revoke);
+app.route("/forgot-password", forgotPassword);
+app.route("/reset-password", resetPassword);
 
 // Auth-protected RBAC routes
 const rolesApp = new Hono<{ Bindings: Bindings; Variables: Variables }>();

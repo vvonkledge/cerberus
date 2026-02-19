@@ -66,6 +66,17 @@ export const userRoles = sqliteTable("user_roles", {
 		.$defaultFn(() => new Date().toISOString()),
 });
 
+export const passwordResetTokens = sqliteTable("password_reset_tokens", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	token: text("token").unique().notNull(),
+	userId: integer("user_id").notNull(),
+	expiresAt: text("expires_at").notNull(),
+	usedAt: text("used_at"),
+	createdAt: text("created_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+});
+
 export const auditLogs = sqliteTable("audit_logs", {
 	id: integer("id").primaryKey({ autoIncrement: true }),
 	eventType: text("event_type").notNull(),
