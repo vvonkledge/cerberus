@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Database } from "../db/client";
-import { permissions, rolePermissions, roles } from "../db/schema";
+import { permissions, rolePermissions, roles, userRoles } from "../db/schema";
 
 type Bindings = {
 	TURSO_DATABASE_URL: string;
@@ -127,6 +127,51 @@ rolesApp.post("/:roleId/permissions", async (c) => {
 	}
 
 	return c.json({ roleId, permission: body.permission }, 200);
+});
+
+rolesApp.put("/:roleId", async (c) => {
+	const roleId = Number(c.req.param("roleId"));
+	const body = await c.req.json<{ name?: string }>();
+
+	if (!body.name) {
+		return c.json({ error: "Name is required" }, 400);
+	}
+
+	const db = c.get("db");
+
+	const role = await db.select().from(roles).where(eq(roles.id, roleId)).get();
+	if (!role) {
+		return c.json({ error: "Role not found" }, 404);
+	}
+
+	await db.update(roles).set({ name: body.name }).where(eq(roles.id, roleId));
+
+	return c.json({ id: role.id, name: body.name, description: role.description }, 200);
+});
+
+rolesApp.delete("/:roleId", async (c) => {
+	const roleId = Number(c.req.param("roleId"));
+	const db = c.get("db");
+
+	const role = await db.select().from(roles).where(eq(roles.id, roleId)).get();
+	if (!role) {
+		return c.json({ error: "Role not found" }, 404);
+	}
+
+	const assigned = await db
+		.select()
+		.from(userRoles)
+		.where(eq(userRoles.roleId, roleId))
+		.get();
+
+	if (assigned) {
+		return c.json({ error: "Role is still assigned to users" }, 409);
+	}
+
+	await db.delete(rolePermissions).where(eq(rolePermissions.roleId, roleId));
+	await db.delete(roles).where(eq(roles.id, roleId));
+
+	return c.json({ message: "Role deleted" }, 200);
 });
 
 export default rolesApp;

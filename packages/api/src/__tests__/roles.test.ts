@@ -108,6 +108,34 @@ function rolesRequest(path: string, body: unknown) {
 	);
 }
 
+function rolesPutRequest(path: string, body: unknown) {
+	return testApp.request(
+		`/roles${path}`,
+		{
+			method: "PUT",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${validToken}`,
+			},
+			body: JSON.stringify(body),
+		},
+		{ JWT_SECRET: TEST_JWT_SECRET },
+	);
+}
+
+function rolesDeleteRequest(path: string) {
+	return testApp.request(
+		`/roles${path}`,
+		{
+			method: "DELETE",
+			headers: {
+				Authorization: `Bearer ${validToken}`,
+			},
+		},
+		{ JWT_SECRET: TEST_JWT_SECRET },
+	);
+}
+
 describe("POST /roles", () => {
 	it("returns 201 and creates a role with valid name and description", async () => {
 		const res = await rolesRequest("", {
@@ -169,6 +197,124 @@ describe("POST /roles/:roleId/permissions", () => {
 	});
 });
 
+describe("PUT /roles/:roleId", () => {
+	it("returns 200 and updates the role name", async () => {
+		const createRes = await rolesRequest("", {
+			name: "editor",
+			description: "Editor role",
+		});
+		const created = await createRes.json();
+
+		const res = await rolesPutRequest(`/${created.id}`, { name: "reviewer" });
+
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.id).toBe(created.id);
+		expect(body.name).toBe("reviewer");
+		expect(body.description).toBe("Editor role");
+	});
+
+	it("returns 400 when name is missing", async () => {
+		const createRes = await rolesRequest("", {
+			name: "editor",
+			description: "Editor role",
+		});
+		const created = await createRes.json();
+
+		const res = await rolesPutRequest(`/${created.id}`, {});
+
+		expect(res.status).toBe(400);
+		const body = await res.json();
+		expect(body.error).toBe("Name is required");
+	});
+
+	it("returns 400 when name is empty string", async () => {
+		const createRes = await rolesRequest("", {
+			name: "editor",
+			description: "Editor role",
+		});
+		const created = await createRes.json();
+
+		const res = await rolesPutRequest(`/${created.id}`, { name: "" });
+
+		expect(res.status).toBe(400);
+		const body = await res.json();
+		expect(body.error).toBe("Name is required");
+	});
+
+	it("returns 404 when role does not exist", async () => {
+		const res = await rolesPutRequest("/9999", { name: "ghost" });
+
+		expect(res.status).toBe(404);
+		const body = await res.json();
+		expect(body.error).toBe("Role not found");
+	});
+});
+
+describe("DELETE /roles/:roleId", () => {
+	it("returns 200 and deletes the role", async () => {
+		const createRes = await rolesRequest("", {
+			name: "temp-role",
+			description: "Temporary",
+		});
+		const created = await createRes.json();
+
+		const res = await rolesDeleteRequest(`/${created.id}`);
+
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.message).toBe("Role deleted");
+	});
+
+	it("returns 404 when role does not exist", async () => {
+		const res = await rolesDeleteRequest("/9999");
+
+		expect(res.status).toBe(404);
+		const body = await res.json();
+		expect(body.error).toBe("Role not found");
+	});
+
+	it("returns 409 when role is assigned to users", async () => {
+		// The seed data assigns role 1 (__seed__) to user 1 via user_roles
+		const res = await rolesDeleteRequest("/1");
+
+		expect(res.status).toBe(409);
+		const body = await res.json();
+		expect(body.error).toBe("Role is still assigned to users");
+	});
+
+	it("also cleans up role_permissions when deleting", async () => {
+		const createRes = await rolesRequest("", {
+			name: "perm-role",
+			description: "Has permissions",
+		});
+		const created = await createRes.json();
+
+		// Assign a permission to this role
+		await rolesRequest(`/${created.id}/permissions`, {
+			permission: "test:delete",
+		});
+
+		const deleteRes = await rolesDeleteRequest(`/${created.id}`);
+		expect(deleteRes.status).toBe(200);
+
+		// Verify role_permissions were cleaned up by checking GET /roles
+		const listRes = await testApp.request(
+			"/roles",
+			{
+				method: "GET",
+				headers: { Authorization: `Bearer ${validToken}` },
+			},
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		const allRoles = await listRes.json();
+		const deletedRole = (allRoles as Array<{ id: number }>).find(
+			(r) => r.id === created.id,
+		);
+		expect(deletedRole).toBeUndefined();
+	});
+});
+
 describe("Auth middleware on /roles", () => {
 	it("returns 401 for GET /roles without Authorization header", async () => {
 		const res = await testApp.request(
@@ -188,6 +334,32 @@ describe("Auth middleware on /roles", () => {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ name: "admin", description: "Admin" }),
+			},
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Authorization required");
+	});
+
+	it("returns 401 for DELETE /roles/:id without Authorization header", async () => {
+		const res = await testApp.request(
+			"/roles/1",
+			{ method: "DELETE" },
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Authorization required");
+	});
+
+	it("returns 401 for PUT /roles/:id without Authorization header", async () => {
+		const res = await testApp.request(
+			"/roles/1",
+			{
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ name: "new-name" }),
 			},
 			{ JWT_SECRET: TEST_JWT_SECRET },
 		);
@@ -257,6 +429,38 @@ describe("Authorization on /roles", () => {
 					Authorization: `Bearer ${noPermToken}`,
 				},
 				body: JSON.stringify({ permission: "test:read" }),
+			},
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Forbidden");
+	});
+
+	it("returns 403 for DELETE /roles/:id without manage_roles permission", async () => {
+		const res = await testApp.request(
+			"/roles/1",
+			{
+				method: "DELETE",
+				headers: { Authorization: `Bearer ${noPermToken}` },
+			},
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Forbidden");
+	});
+
+	it("returns 403 for PUT /roles/:id without manage_roles permission", async () => {
+		const res = await testApp.request(
+			"/roles/1",
+			{
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${noPermToken}`,
+				},
+				body: JSON.stringify({ name: "hacked" }),
 			},
 			{ JWT_SECRET: TEST_JWT_SECRET },
 		);
