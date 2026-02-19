@@ -65,3 +65,14 @@ export const userRoles = sqliteTable("user_roles", {
 		.notNull()
 		.$defaultFn(() => new Date().toISOString()),
 });
+
+export const auditLogs = sqliteTable("audit_logs", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	eventType: text("event_type").notNull(),
+	userId: text("user_id"),
+	ipAddress: text("ip_address").notNull(),
+	timestamp: text("timestamp")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	metadata: text("metadata"),
+});

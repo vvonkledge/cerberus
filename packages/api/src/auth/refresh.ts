@@ -2,6 +2,7 @@ import { and, eq, isNotNull, lt, or } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Database } from "../db/client";
 import { refreshTokens } from "../db/schema";
+import { getClientIp, writeAuditLog } from "../middleware/audit";
 import { generateRefreshToken, signJwt } from "./crypto";
 
 type Bindings = {
@@ -72,6 +73,12 @@ refresh.post("/", async (c) => {
 		);
 
 	const token = await signJwt({ sub: String(row.userId) }, c.env.JWT_SECRET);
+
+	await writeAuditLog(db, {
+		eventType: "refresh",
+		userId: String(row.userId),
+		ipAddress: getClientIp(c),
+	});
 
 	return c.json({
 		access_token: token,

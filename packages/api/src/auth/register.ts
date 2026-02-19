@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Database } from "../db/client";
 import { users } from "../db/schema";
+import { getClientIp, writeAuditLog } from "../middleware/audit";
 import { hashPassword } from "./crypto";
 
 type Bindings = {
@@ -31,6 +32,12 @@ register.post("/", async (c) => {
 		});
 
 		const id = Number(result.lastInsertRowid);
+		await writeAuditLog(db, {
+			eventType: "register",
+			userId: String(id),
+			ipAddress: getClientIp(c),
+			metadata: JSON.stringify({ email: body.email }),
+		});
 		return c.json({ id, email: body.email }, 201);
 	} catch (err: unknown) {
 		const message =

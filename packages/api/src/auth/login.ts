@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Database } from "../db/client";
 import { refreshTokens, users } from "../db/schema";
+import { getClientIp, writeAuditLog } from "../middleware/audit";
 import { generateRefreshToken, signJwt, verifyPassword } from "./crypto";
 
 type Bindings = {
@@ -29,11 +30,23 @@ login.post("/", async (c) => {
 	const [user] = await db.select().from(users).where(eq(users.email, email));
 
 	if (!user) {
+		await writeAuditLog(db, {
+			eventType: "login_failed",
+			userId: null,
+			ipAddress: getClientIp(c),
+			metadata: JSON.stringify({ email }),
+		});
 		return c.json({ error: "Invalid credentials" }, 401);
 	}
 
 	const valid = await verifyPassword(password, user.hashedPassword);
 	if (!valid) {
+		await writeAuditLog(db, {
+			eventType: "login_failed",
+			userId: null,
+			ipAddress: getClientIp(c),
+			metadata: JSON.stringify({ email }),
+		});
 		return c.json({ error: "Invalid credentials" }, 401);
 	}
 
@@ -45,6 +58,13 @@ login.post("/", async (c) => {
 		token: refreshToken,
 		userId: user.id,
 		expiresAt,
+	});
+
+	await writeAuditLog(db, {
+		eventType: "login",
+		userId: String(user.id),
+		ipAddress: getClientIp(c),
+		metadata: JSON.stringify({ email }),
 	});
 
 	return c.json({

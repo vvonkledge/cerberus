@@ -12,6 +12,7 @@ import {
 	KVRateLimitStore,
 	rateLimiter,
 } from "./middleware/rate-limiter";
+import auditLogs from "./rbac/audit-logs";
 import roles from "./rbac/roles";
 import seed from "./rbac/seed";
 import userRoles from "./rbac/user-roles";
@@ -106,8 +107,14 @@ usersApp.use("*", authMiddleware());
 usersApp.use("*", requirePermission("manage_users"));
 usersApp.route("/", userRoles);
 
+const auditLogsApp = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+auditLogsApp.use("*", authMiddleware());
+auditLogsApp.use("*", requirePermission("manage_users"));
+auditLogsApp.route("/", auditLogs);
+
 app.route("/roles", rolesApp);
 app.route("/users", usersApp);
+app.route("/audit-logs", auditLogsApp);
 
 // Bootstrap seed route (no auth required)
 app.route("/seed", seed);

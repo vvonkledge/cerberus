@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { Context, Next } from "hono";
 import { permissions, rolePermissions, userRoles } from "../db/schema";
+import { getClientIp, writeAuditLog } from "./audit";
 
 export function requirePermission(permissionName: string) {
 	return async (c: Context, next: Next) => {
@@ -21,9 +22,21 @@ export function requirePermission(permissionName: string) {
 		);
 
 		if (!hasPermission) {
+			await writeAuditLog(db, {
+				eventType: "authz_denied",
+				userId: user.sub,
+				ipAddress: getClientIp(c),
+				metadata: JSON.stringify({ permission: permissionName }),
+			});
 			return c.json({ error: "Forbidden" }, 403);
 		}
 
+		await writeAuditLog(db, {
+			eventType: "authz_granted",
+			userId: user.sub,
+			ipAddress: getClientIp(c),
+			metadata: JSON.stringify({ permission: permissionName }),
+		});
 		await next();
 	};
 }

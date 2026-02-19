@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Database } from "../db/client";
 import { refreshTokens } from "../db/schema";
+import { getClientIp, writeAuditLog } from "../middleware/audit";
 
 type Bindings = {
 	TURSO_DATABASE_URL: string;
@@ -38,6 +39,12 @@ revoke.post("/", async (c) => {
 		.update(refreshTokens)
 		.set({ revokedAt: new Date().toISOString() })
 		.where(eq(refreshTokens.token, refresh_token));
+
+	await writeAuditLog(db, {
+		eventType: "revoke",
+		userId: String(row.userId),
+		ipAddress: getClientIp(c),
+	});
 
 	return c.json({ message: "Token revoked" });
 });
