@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useApiFetch } from "../api-client";
 
 interface User {
 	id: number;
@@ -12,6 +13,7 @@ interface Role {
 }
 
 export function UserDetailPage() {
+	const apiFetch = useApiFetch();
 	const { id } = useParams<{ id: string }>();
 	const [user, setUser] = useState<User | null>(null);
 	const [permissions, setPermissions] = useState<string[]>([]);
@@ -24,9 +26,9 @@ export function UserDetailPage() {
 	async function fetchData() {
 		try {
 			const [usersRes, permsRes, rolesRes] = await Promise.all([
-				fetch("/users"),
-				fetch(`/users/${id}/permissions`),
-				fetch("/roles"),
+				apiFetch("/users"),
+				apiFetch(`/users/${id}/permissions`),
+				apiFetch("/roles"),
 			]);
 
 			if (!usersRes.ok) throw new Error(`Failed to fetch users: ${usersRes.status}`);
@@ -62,7 +64,7 @@ export function UserDetailPage() {
 		if (!selectedRoleId) return;
 		setAssigning(true);
 		try {
-			const res = await fetch(`/users/${id}/roles`, {
+			const res = await apiFetch(`/users/${id}/roles`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ roleId: Number(selectedRoleId) }),

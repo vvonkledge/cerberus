@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useApiFetch } from "../api-client";
 
 interface User {
 	id: number;
@@ -7,6 +8,7 @@ interface User {
 }
 
 export function UsersPage() {
+	const apiFetch = useApiFetch();
 	const [users, setUsers] = useState<User[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -14,7 +16,7 @@ export function UsersPage() {
 	useEffect(() => {
 		async function fetchUsers() {
 			try {
-				const res = await fetch("/users");
+				const res = await apiFetch("/users");
 				if (!res.ok) throw new Error(`Failed to fetch users: ${res.status}`);
 				const data = await res.json();
 				setUsers(data);

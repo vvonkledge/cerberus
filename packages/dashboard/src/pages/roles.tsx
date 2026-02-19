@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useApiFetch } from "../api-client";
 
 interface Role {
 	id: number;
@@ -9,6 +10,7 @@ interface Role {
 }
 
 export function RolesPage() {
+	const apiFetch = useApiFetch();
 	const [roles, setRoles] = useState<Role[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -18,7 +20,7 @@ export function RolesPage() {
 
 	async function fetchRoles() {
 		try {
-			const res = await fetch("/roles");
+			const res = await apiFetch("/roles");
 			if (!res.ok) throw new Error(`Failed to fetch roles: ${res.status}`);
 			const data = await res.json();
 			setRoles(data);
@@ -39,7 +41,7 @@ export function RolesPage() {
 		if (!name.trim()) return;
 		setCreating(true);
 		try {
-			const res = await fetch("/roles", {
+			const res = await apiFetch("/roles", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ name: name.trim(), description: description.trim() || undefined }),
