@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Database } from "../db/client";
 import {
@@ -82,7 +82,40 @@ userRolesApp.get("/:userId/permissions", async (c) => {
 
 	const uniquePermissions = [...new Set(rows.map((r) => r.permission))];
 
-	return c.json({ permissions: uniquePermissions }, 200);
+	const assignedRoles = await db
+		.select({ id: roles.id, name: roles.name })
+		.from(userRoles)
+		.innerJoin(roles, eq(userRoles.roleId, roles.id))
+		.where(eq(userRoles.userId, userId))
+		.all();
+
+	return c.json({ permissions: uniquePermissions, roles: assignedRoles }, 200);
+});
+
+userRolesApp.delete("/:userId/roles/:roleId", async (c) => {
+	const userId = Number(c.req.param("userId"));
+	const roleId = Number(c.req.param("roleId"));
+	const db = c.get("db");
+
+	const user = await db.select().from(users).where(eq(users.id, userId)).get();
+	if (!user) {
+		return c.json({ error: "User not found" }, 404);
+	}
+
+	const assignment = await db
+		.select()
+		.from(userRoles)
+		.where(and(eq(userRoles.userId, userId), eq(userRoles.roleId, roleId)))
+		.get();
+	if (!assignment) {
+		return c.json({ error: "Role not assigned to user" }, 404);
+	}
+
+	await db
+		.delete(userRoles)
+		.where(and(eq(userRoles.userId, userId), eq(userRoles.roleId, roleId)));
+
+	return c.json({ message: "Role unassigned" }, 200);
 });
 
 export default userRolesApp;

@@ -203,7 +203,7 @@ describe("POST /users/:userId/roles", () => {
 });
 
 describe("GET /users/:userId/permissions", () => {
-	it("returns permissions array after assigning a role with permissions", async () => {
+	it("returns permissions and roles after assigning a role with permissions", async () => {
 		const userId = await createUser();
 		const roleId = await createRoleWithPermissions("admin", [
 			"users:read",
@@ -215,21 +215,79 @@ describe("GET /users/:userId/permissions", () => {
 		const res = await getUserPermissions(userId);
 
 		expect(res.status).toBe(200);
-		const body = (await res.json()) as { permissions: string[] };
+		const body = (await res.json()) as {
+			permissions: string[];
+			roles: { id: number; name: string }[];
+		};
 		expect(body.permissions).toHaveLength(3);
 		expect(body.permissions).toContain("users:read");
 		expect(body.permissions).toContain("users:write");
 		expect(body.permissions).toContain("posts:read");
+		expect(body.roles).toHaveLength(1);
+		expect(body.roles[0]).toEqual({ id: roleId, name: "admin" });
 	});
 
-	it("returns empty array for user with no roles", async () => {
+	it("returns empty arrays for user with no roles", async () => {
 		const userId = await createUser();
 
 		const res = await getUserPermissions(userId);
 
 		expect(res.status).toBe(200);
-		const body = (await res.json()) as { permissions: string[] };
+		const body = (await res.json()) as {
+			permissions: string[];
+			roles: { id: number; name: string }[];
+		};
 		expect(body.permissions).toEqual([]);
+		expect(body.roles).toEqual([]);
+	});
+});
+
+function deleteUserRole(userId: number, roleId: number) {
+	return testApp.request(
+		`/users/${userId}/roles/${roleId}`,
+		{
+			method: "DELETE",
+			headers: { Authorization: `Bearer ${validToken}` },
+		},
+		{ JWT_SECRET: TEST_JWT_SECRET },
+	);
+}
+
+describe("DELETE /users/:userId/roles/:roleId", () => {
+	it("returns 200 and removes the role assignment", async () => {
+		const userId = await createUser();
+		const roleId = await createRoleWithPermissions("admin", ["users:read"]);
+		await postUserRoles(userId, { roleId });
+
+		const res = await deleteUserRole(userId, roleId);
+
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body).toEqual({ message: "Role unassigned" });
+
+		// Verify the role is actually removed by checking permissions
+		const permRes = await getUserPermissions(userId);
+		const permBody = (await permRes.json()) as { permissions: string[] };
+		expect(permBody.permissions).toEqual([]);
+	});
+
+	it("returns 404 when userId does not exist", async () => {
+		const res = await deleteUserRole(9999, 1);
+
+		expect(res.status).toBe(404);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("User not found");
+	});
+
+	it("returns 404 when role is not assigned to user", async () => {
+		const userId = await createUser();
+		const roleId = await createRoleWithPermissions("admin", ["users:read"]);
+
+		const res = await deleteUserRole(userId, roleId);
+
+		expect(res.status).toBe(404);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Role not assigned to user");
 	});
 });
 
@@ -253,6 +311,17 @@ describe("Auth middleware on /users", () => {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ roleId: 1 }),
 			},
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(401);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Authorization required");
+	});
+
+	it("returns 401 for DELETE /users/:id/roles/:id without Authorization header", async () => {
+		const res = await testApp.request(
+			"/users/1/roles/1",
+			{ method: "DELETE" },
 			{ JWT_SECRET: TEST_JWT_SECRET },
 		);
 		expect(res.status).toBe(401);
@@ -303,6 +372,20 @@ describe("Authorization on /users", () => {
 					Authorization: `Bearer ${noPermToken}`,
 				},
 				body: JSON.stringify({ roleId: 1 }),
+			},
+			{ JWT_SECRET: TEST_JWT_SECRET },
+		);
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toBe("Forbidden");
+	});
+
+	it("returns 403 for DELETE /users/:id/roles/:id without manage_users permission", async () => {
+		const res = await testApp.request(
+			"/users/1/roles/1",
+			{
+				method: "DELETE",
+				headers: { Authorization: `Bearer ${noPermToken}` },
 			},
 			{ JWT_SECRET: TEST_JWT_SECRET },
 		);
