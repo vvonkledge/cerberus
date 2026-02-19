@@ -18,10 +18,12 @@ export function UserDetailPage() {
 	const [user, setUser] = useState<User | null>(null);
 	const [permissions, setPermissions] = useState<string[]>([]);
 	const [roles, setRoles] = useState<Role[]>([]);
+	const [assignedRoles, setAssignedRoles] = useState<Role[]>([]);
 	const [selectedRoleId, setSelectedRoleId] = useState("");
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [assigning, setAssigning] = useState(false);
+	const [removing, setRemoving] = useState<number | null>(null);
 
 	async function fetchData() {
 		try {
@@ -40,6 +42,7 @@ export function UserDetailPage() {
 			if (permsRes.ok) {
 				const permsData = await permsRes.json();
 				setPermissions(permsData.permissions || []);
+				setAssignedRoles(permsData.roles || []);
 			}
 
 			if (rolesRes.ok) {
@@ -82,6 +85,24 @@ export function UserDetailPage() {
 		}
 	}
 
+	async function handleRemoveRole(roleId: number) {
+		setRemoving(roleId);
+		try {
+			const res = await apiFetch(`/users/${id}/roles/${roleId}`, {
+				method: "DELETE",
+			});
+			if (!res.ok) {
+				const data = await res.json();
+				throw new Error(data.error || `Failed to remove role: ${res.status}`);
+			}
+			setAssignedRoles((prev) => prev.filter((r) => r.id !== roleId));
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to remove role");
+		} finally {
+			setRemoving(null);
+		}
+	}
+
 	if (loading) return <p>Loading user...</p>;
 	if (!user) return <p className="text-red-600">{error || "User not found"}</p>;
 
@@ -93,6 +114,29 @@ export function UserDetailPage() {
 			<p className="text-gray-500 text-sm mb-4">User ID: {user.id}</p>
 
 			{error && <p className="text-red-600 mb-4">{error}</p>}
+
+			<div className="mb-6">
+				<h3 className="font-semibold mb-2">Assigned Roles</h3>
+				{assignedRoles.length === 0 ? (
+					<p className="text-gray-500">No roles assigned.</p>
+				) : (
+					<ul>
+						{assignedRoles.map((role) => (
+							<li key={role.id} className="flex items-center justify-between py-1">
+								<span className="font-mono text-sm">{role.name}</span>
+								<button
+									type="button"
+									onClick={() => handleRemoveRole(role.id)}
+									disabled={removing === role.id}
+									className="text-red-600 hover:text-red-800 text-sm ml-2 disabled:opacity-50"
+								>
+									{removing === role.id ? "Removing..." : "Remove"}
+								</button>
+							</li>
+						))}
+					</ul>
+				)}
+			</div>
 
 			<div className="mb-6">
 				<h3 className="font-semibold mb-2">Resolved Permissions</h3>
