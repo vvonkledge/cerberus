@@ -77,6 +77,18 @@ export const passwordResetTokens = sqliteTable("password_reset_tokens", {
 		.$defaultFn(() => new Date().toISOString()),
 });
 
+export const apiKeys = sqliteTable("api_keys", {
+	id: integer("id").primaryKey({ autoIncrement: true }),
+	userId: integer("user_id").notNull(),
+	name: text("name").notNull(),
+	keyHash: text("key_hash").notNull().unique(),
+	keyPrefix: text("key_prefix").notNull(),
+	createdAt: text("created_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	revokedAt: text("revoked_at"),
+});
+
 export const auditLogs = sqliteTable("audit_logs", {
 	id: integer("id").primaryKey({ autoIncrement: true }),
 	eventType: text("event_type").notNull(),

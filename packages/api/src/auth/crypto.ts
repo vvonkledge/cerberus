@@ -124,6 +124,17 @@ export function generateRefreshToken(): string {
 	return hexEncode(bytes.buffer as ArrayBuffer);
 }
 
+export function generateApiKey(): string {
+	const bytes = crypto.getRandomValues(new Uint8Array(32));
+	return `crb_${hexEncode(bytes.buffer as ArrayBuffer)}`;
+}
+
+export async function hashApiKey(key: string): Promise<string> {
+	const data = new TextEncoder().encode(key);
+	const hash = await crypto.subtle.digest("SHA-256", data);
+	return hexEncode(hash);
+}
+
 export async function verifyJwt(
 	token: string,
 	secret: string,
