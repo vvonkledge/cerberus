@@ -58,7 +58,8 @@ const CREATE_TABLES = `
 `;
 
 const JWT_SECRET = "test-secret-for-error-paths";
-const ENV = { JWT_SECRET };
+const ADMIN_SETUP_TOKEN = "test-setup-token-for-error-paths";
+const ENV = { JWT_SECRET, ADMIN_SETUP_TOKEN };
 
 type AppBindings = {
 	TURSO_DATABASE_URL: string;

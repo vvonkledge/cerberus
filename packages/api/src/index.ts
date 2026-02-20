@@ -26,6 +26,7 @@ type Bindings = {
 	JWT_SECRET: string;
 	ASSETS: Fetcher;
 	RATE_LIMIT_KV?: KVNamespace;
+	ADMIN_SETUP_TOKEN?: string;
 };
 
 type Variables = {

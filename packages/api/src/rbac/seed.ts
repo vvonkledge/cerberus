@@ -6,6 +6,7 @@ import { permissions, rolePermissions, roles, userRoles } from "../db/schema";
 type Bindings = {
 	TURSO_DATABASE_URL: string;
 	TURSO_AUTH_TOKEN?: string;
+	ADMIN_SETUP_TOKEN?: string;
 };
 
 type Variables = {
@@ -15,6 +16,13 @@ type Variables = {
 const seedApp = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 seedApp.post("/", async (c) => {
+	const expectedToken = c.env.ADMIN_SETUP_TOKEN;
+	const providedToken = c.req.header("X-Setup-Token");
+
+	if (!expectedToken || !providedToken || providedToken !== expectedToken) {
+		return c.json({ error: "Invalid setup token" }, 401);
+	}
+
 	const body = await c.req.json<{ userId?: number }>();
 
 	if (!body.userId) {

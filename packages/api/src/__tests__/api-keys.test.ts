@@ -175,7 +175,8 @@ beforeEach(async () => {
 	testApp = app;
 });
 
-const env = { JWT_SECRET: TEST_JWT_SECRET };
+const TEST_SETUP_TOKEN = "test-setup-token-for-api-keys";
+const env = { JWT_SECRET: TEST_JWT_SECRET, ADMIN_SETUP_TOKEN: TEST_SETUP_TOKEN };
 
 async function registerUser(
 	email = "user@example.com",
@@ -740,7 +741,7 @@ describe("API key management", () => {
 				"/seed",
 				{
 					method: "POST",
-					headers: { "Content-Type": "application/json" },
+					headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 					body: JSON.stringify({ userId: regBody.id }),
 				},
 				env,
@@ -800,7 +801,7 @@ describe("API key management", () => {
 				"/seed",
 				{
 					method: "POST",
-					headers: { "Content-Type": "application/json" },
+					headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 					body: JSON.stringify({ userId: regBody.id }),
 				},
 				env,

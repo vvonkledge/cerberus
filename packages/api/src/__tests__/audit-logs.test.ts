@@ -117,7 +117,8 @@ beforeEach(async () => {
 	testApp = app;
 });
 
-const env = { JWT_SECRET: TEST_JWT_SECRET };
+const TEST_SETUP_TOKEN = "test-setup-token-for-audit";
+const env = { JWT_SECRET: TEST_JWT_SECRET, ADMIN_SETUP_TOKEN: TEST_SETUP_TOKEN };
 
 async function registerUser(email = "user@example.com", password = "password123") {
 	const res = await testApp.request(
@@ -273,7 +274,7 @@ describe("Authorization audit logging", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: regBody.id }),
 			},
 			env,
@@ -331,7 +332,7 @@ describe("GET /audit-logs endpoint", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: regBody.id }),
 			},
 			env,
@@ -368,7 +369,7 @@ describe("GET /audit-logs endpoint", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: regBody.id }),
 			},
 			env,
@@ -437,7 +438,7 @@ describe("GET /audit-logs endpoint", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: regBody.id }),
 			},
 			env,

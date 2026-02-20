@@ -102,7 +102,8 @@ beforeEach(async () => {
 	testApp = app;
 });
 
-const env = { JWT_SECRET: TEST_JWT_SECRET };
+const TEST_SETUP_TOKEN = "test-setup-token-for-e2e";
+const env = { JWT_SECRET: TEST_JWT_SECRET, ADMIN_SETUP_TOKEN: TEST_SETUP_TOKEN };
 
 describe("Admin Setup Journey", () => {
 	let adminUserId: number;
@@ -182,7 +183,7 @@ describe("Admin Setup Journey", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: adminUserId }),
 			},
 			env,
@@ -213,7 +214,7 @@ describe("Admin Setup Journey", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: adminUserId }),
 			},
 			env,
@@ -223,7 +224,7 @@ describe("Admin Setup Journey", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: adminUserId }),
 			},
 			env,
@@ -251,7 +252,7 @@ describe("Admin Setup Journey", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: adminUserId }),
 			},
 			env,
@@ -308,7 +309,7 @@ describe("Admin Setup Journey", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: adminUserId }),
 			},
 			env,
@@ -382,7 +383,7 @@ describe("Admin Setup Journey", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: adminUserId }),
 			},
 			env,
@@ -464,7 +465,7 @@ describe("Admin Setup Journey", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: adminUserId }),
 			},
 			env,
@@ -589,7 +590,7 @@ describe("Admin Setup Journey", () => {
 			"/seed",
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: { "Content-Type": "application/json", "X-Setup-Token": TEST_SETUP_TOKEN },
 				body: JSON.stringify({ userId: adminUserId }),
 			},
 			env,
