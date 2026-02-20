@@ -1,0 +1,134 @@
+{
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": ".*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type PreToolUse"
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": ".*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type PostToolUse"
+					}
+				]
+			}
+		],
+		"PostToolUseFailure": [
+			{
+				"matcher": ".*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type PostToolUseFailure"
+					}
+				]
+			}
+		],
+		"PermissionRequest": [
+			{
+				"matcher": ".*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type PermissionRequest"
+					}
+				]
+			}
+		],
+		"SessionStart": [
+			{
+				"matcher": ".*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type SessionStart"
+					}
+				]
+			}
+		],
+		"SessionEnd": [
+			{
+				"matcher": ".*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type SessionEnd"
+					}
+				]
+			}
+		],
+		"SubagentStart": [
+			{
+				"matcher": ".*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type SubagentStart"
+					}
+				]
+			}
+		],
+		"SubagentStop": [
+			{
+				"matcher": ".*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type SubagentStop"
+					}
+				]
+			}
+		],
+		"Notification": [
+			{
+				"matcher": ".*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type Notification"
+					}
+				]
+			}
+		],
+		"PreCompact": [
+			{
+				"matcher": ".*",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type PreCompact"
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type Stop"
+					}
+				]
+			}
+		],
+		"UserPromptSubmit": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 {{SIANA_DIR}}/hooks/send_event.py --source-app claude-code --event-type UserPromptSubmit"
+					}
+				]
+			}
+		]
+	}
+}
