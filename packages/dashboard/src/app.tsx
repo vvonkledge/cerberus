@@ -4,6 +4,7 @@ import { RoleDetailPage } from "./pages/role-detail";
 import { UsersPage } from "./pages/users";
 import { UserDetailPage } from "./pages/user-detail";
 import { AuditLogsPage } from "./pages/audit-logs";
+import { ApiKeysPage } from "./pages/api-keys";
 import { LoginPage } from "./pages/login";
 import { ProtectedRoute } from "./protected-route";
 import { useAuth } from "./auth-context";
@@ -24,6 +25,7 @@ function Layout() {
 				<Link to="/roles" className="text-gray-700 hover:text-blue-600">Roles</Link>
 				<Link to="/users" className="text-gray-700 hover:text-blue-600">Users</Link>
 				<Link to="/audit-logs" className="text-gray-700 hover:text-blue-600">Audit Logs</Link>
+				<Link to="/api-keys" className="text-gray-700 hover:text-blue-600">API Keys</Link>
 				<button
 					onClick={handleLogout}
 					className="ml-auto text-gray-600 hover:text-red-600"
@@ -50,6 +52,7 @@ export function App() {
 					<Route path="users" element={<UsersPage />} />
 					<Route path="users/:id" element={<UserDetailPage />} />
 					<Route path="audit-logs" element={<AuditLogsPage />} />
+					<Route path="api-keys" element={<ApiKeysPage />} />
 				</Route>
 			</Route>
 		</Routes>

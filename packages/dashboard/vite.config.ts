@@ -13,6 +13,7 @@ export default defineConfig({
 			"/users": "http://localhost:8787",
 			"/seed": "http://localhost:8787",
 			"/health": "http://localhost:8787",
+			"/api-keys": "http://localhost:8787",
 		},
 	},
 });
